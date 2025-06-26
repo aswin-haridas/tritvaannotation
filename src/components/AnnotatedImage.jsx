@@ -3,7 +3,7 @@ import "./AnnotatedImage.css";
 
 // Helper function to get a consistent color for each anomaly type
 const getAnomalyColor = (className, opacity = 0.4) => {
-  const name = className.toLowerCase();
+  const name = className?.toLowerCase();
   let color = "132, 94, 247"; // Default violet
 
   if (name.includes("crack")) {
@@ -55,7 +55,7 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
 
     // First, draw structural bounding boxes (behind anomalies)
     annotationData.forEach((element) => {
-      if (element.structural_bbox_original_frame && element.structural_class) {
+      if (element?.structural_bbox_original_frame && element?.structural_class) {
         const [x1, y1, x2, y2] = element.structural_bbox_original_frame;
 
         // Scale coordinates
