@@ -287,6 +287,19 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
       ?.join?.(" ");
   };
 
+  //extract severity from class_name after _ like from class_name_9 sevierty is 9
+  // Extract severity as a string (e.g., "9") from class_name like "class_name_9"
+  const severityMatch = hoveredAnnotation?.class_name?.match(/_(\d+)$/);
+  const severity =
+    hoveredAnnotation?.severity ||
+    (severityMatch ? severityMatch[1] : undefined);
+
+  // Clean class_name: remove everything after the first underscore
+  const cleanClassName = (name) => {
+    if (!name) return "";
+    return name.split("_")[0];
+  };
+
   return (
     <div className="annotated-image-container" ref={containerRef}>
       <img
@@ -298,7 +311,7 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
         className="annotation-image"
         onError={(e) => console.error("Image failed to load:", e)}
       />
-      <canvas ref={canvasRef} className="annotation-canvas" />{" "}
+      <canvas ref={canvasRef} className="annotation-canvas" />
       {hoveredAnnotation && (
         <div
           className="tooltip"
@@ -308,12 +321,11 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
           }}
         >
           <p style={{ textTransform: "capitalize" }}>
-            <strong>Anomaly:</strong> {hoveredAnnotation.class_name}
+            <strong>Anomaly:</strong> {sanitize(cleanClassName(hoveredAnnotation.class_name))}
           </p>
-          {hoveredAnnotation.severity && (
+          {severity && (
             <p>
-              <strong>Severity: </strong>
-              {hoveredAnnotation.severity}
+              <strong>Severity: {severity}</strong>
             </p>
           )}
           {hoveredAnnotation.structural_class && (
