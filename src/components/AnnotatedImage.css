@@ -1,0 +1,42 @@
+.annotated-image-container {
+  position: relative;
+  width: 100%;
+  height: auto; /* Maintain aspect ratio */
+  line-height: 0; /* Removes bottom space under the image */
+}
+
+.annotation-image {
+  width: 100%;
+  height: auto;
+}
+
+.annotation-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.tooltip {
+  position: fixed; /* Use fixed to position relative to viewport */
+  background-color: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 500;
+  pointer-events: none; /* Allows mouse events to pass through to the canvas */
+  z-index: 100;
+  white-space: nowrap;
+  transform: translate(-50%, -100%); /* Position above cursor */
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: -10px; /* Extra space from cursor */
+}
+
+.tooltip p {
+  margin: 4px 0;
+  line-height: 1.4;
+}
