@@ -291,8 +291,7 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
   // Extract severity as a string (e.g., "9") from class_name like "class_name_9"
   const severityMatch = hoveredAnnotation?.class_name?.match(/_(\d+)$/);
   const severity =
-    hoveredAnnotation?.severity ||
-    (severityMatch ? severityMatch[1] : undefined);
+    hoveredAnnotation?.severity || (severityMatch ? severityMatch[1] : 1);
 
   // Clean class_name: remove everything after the first underscore
   const cleanClassName = (name) => {
@@ -321,7 +320,8 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
           }}
         >
           <p style={{ textTransform: "capitalize" }}>
-            <strong>Anomaly:</strong> {sanitize(cleanClassName(hoveredAnnotation.class_name))}
+            <strong>Anomaly:</strong>{" "}
+            {sanitize(cleanClassName(hoveredAnnotation.class_name))}
           </p>
           {severity && (
             <p>
