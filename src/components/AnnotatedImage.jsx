@@ -170,7 +170,6 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-
       let foundAnnotation = null;
 
       // Reverse search to find the topmost annotation
@@ -201,11 +200,51 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
           });
 
           if (isInside) {
+            // Find if this anomaly is inside any structural bounding box
+            let structuralClass = null;
+
+            // Check against all structural bounding boxes
+            annotationData.forEach((structElement) => {
+              if (
+                structElement.structural_bbox_original_frame &&
+                structElement.structural_class
+              ) {
+                console.log(structElement.structural_class);
+                const [box_x1, box_y1, box_x2, box_y2] =
+                  structElement.structural_bbox_original_frame;
+
+                // Check if at least one point of any polygon is inside this bounding box
+                let isInsideStructure = false;
+
+                // Check each polygon in the mask
+                anomaly.mask_original_frame.forEach((polygon) => {
+                  // Check each point in the polygon
+                  for (let k = 0; k < polygon.length; k++) {
+                    const [point_x, point_y] = polygon[k];
+                    if (
+                      point_x >= box_x1 &&
+                      point_x <= box_x2 &&
+                      point_y >= box_y1 &&
+                      point_y <= box_y2
+                    ) {
+                      isInsideStructure = true;
+                      break;
+                    }
+                  }
+                });
+
+                if (isInsideStructure) {
+                  structuralClass = structElement.structural_class;
+                }
+              }
+            });
+
             foundAnnotation = {
               class_name: anomaly.class_name,
               severity: anomaly.severity,
               confidence_score: anomaly.confidence_score,
               mask: anomaly.mask_original_frame, // Use a unique reference
+              structural_class: structuralClass, // Add structural class information
             };
             break;
           }
@@ -229,6 +268,16 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
       canvas.removeEventListener("mouseleave", handleMouseLeave);
     };
   }, [annotationData, originalImageWidth, originalImageHeight]); // Rerun if data changes
+
+  const sanitize = (str) => {
+    if (!str) return "";
+    //remove underscore and capitalize each word
+    return str
+      .replace(/_/g, " ")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
 
   return (
     <div className="annotated-image-container" ref={containerRef}>
@@ -261,8 +310,8 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
           )}
           {hoveredAnnotation.structural_class && (
             <p>
-              Structure:
-              {hoveredAnnotation.structural_class}
+              <strong>Structure: </strong>
+              {sanitize(hoveredAnnotation.structural_class)}
             </p>
           )}
           <strong></strong>
