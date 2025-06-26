@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./AnnotatedImage.css";
 
 // Helper function to get a consistent color for each anomaly type
@@ -27,13 +27,12 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
   // Extract image size from annotationData or use default values
   const imageSize = annotationData?.image_size || [5184, 3888];
   const [originalImageWidth, originalImageHeight] = imageSize;
-
   // State to hold information for the tooltip
   const [hoveredAnnotation, setHoveredAnnotation] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
 
   // This function does the actual drawing on the canvas
-  const drawAnnotations = () => {
+  const drawAnnotations = useCallback(() => {
     const canvas = canvasRef.current;
     const image = imageRef.current;
     const container = containerRef.current;
@@ -54,7 +53,41 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
     // Clear canvas before drawing
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Iterate through all structural elements and their anomalies
+    // First, draw structural bounding boxes (behind anomalies)
+    annotationData.forEach((element) => {
+      if (element.structural_bbox_original_frame && element.structural_class) {
+        const [x1, y1, x2, y2] = element.structural_bbox_original_frame;
+
+        // Scale coordinates
+        const scaledX1 = x1 * scaleX;
+        const scaledY1 = y1 * scaleY;
+        const scaledX2 = x2 * scaleX;
+        const scaledY2 = y2 * scaleY;
+
+        // Draw bounding box with light styling
+        ctx.strokeStyle = "rgba(154, 154, 154, 0.5)"; // Gray with low opacity
+        ctx.fillStyle = "rgba(47, 47, 47, 0.1)"; // Very light gray fill
+        ctx.lineWidth = 1;
+
+        ctx.fillRect(
+          scaledX1,
+          scaledY1,
+          scaledX2 - scaledX1,
+          scaledY2 - scaledY1
+        );
+        ctx.strokeRect(
+          scaledX1,
+          scaledY1,
+          scaledX2 - scaledX1,
+          scaledY2 - scaledY1
+        );
+
+        // Reset line dash for anomalies
+        ctx.setLineDash([]);
+      }
+    });
+
+    // Then, draw anomalies on top
     annotationData.forEach((element) => {
       // We only care about drawing the anomalies here
       const allAnomalies = [
@@ -96,7 +129,12 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
         });
       });
     });
-  };
+  }, [
+    annotationData,
+    hoveredAnnotation,
+    originalImageWidth,
+    originalImageHeight,
+  ]);
 
   // Effect for initial drawing and redrawing on window resize
   useEffect(() => {
@@ -115,14 +153,12 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
       handleLoad();
     } else {
       image.addEventListener("load", handleLoad);
-    }
-
-    // Cleanup
+    } // Cleanup
     return () => {
       image.removeEventListener("load", handleLoad);
       window.removeEventListener("resize", handleResize);
     };
-  }, [annotationData, hoveredAnnotation]); // Redraw when data or hovered annotation changes
+  }, [annotationData, hoveredAnnotation, drawAnnotations]); // Redraw when data or hovered annotation changes
 
   // Effect for handling mouse interactions
   useEffect(() => {
@@ -192,7 +228,7 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
       canvas.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("mouseleave", handleMouseLeave);
     };
-  }, [annotationData]); // Rerun if data changes
+  }, [annotationData, originalImageWidth, originalImageHeight]); // Rerun if data changes
 
   return (
     <div className="annotated-image-container" ref={containerRef}>
@@ -221,6 +257,12 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
             <p>
               <strong>Severity: </strong>
               {hoveredAnnotation.severity}
+            </p>
+          )}
+          {hoveredAnnotation.structural_class && (
+            <p>
+              Structure:
+              {hoveredAnnotation.structural_class}
             </p>
           )}
           <strong></strong>
