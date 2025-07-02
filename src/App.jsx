@@ -15,7 +15,7 @@ function App() {
 
         // Fetch annotation data
         const annotationResponse = await fetch(
-          "http://192.168.29.151:5000/api/annotations"
+          "http://localhost:5000/api/annotations"
         );
         if (!annotationResponse.ok) {
           throw new Error("Failed to fetch annotation data");
@@ -23,9 +23,7 @@ function App() {
         const annotations = await annotationResponse.json();
 
         // Fetch image
-        const imageResponse = await fetch(
-          "http://192.168.29.151:5000/api/image"
-        );
+        const imageResponse = await fetch("http://localhost:5000/api/image");
         if (!imageResponse.ok) {
           throw new Error("Failed to fetch image");
         }

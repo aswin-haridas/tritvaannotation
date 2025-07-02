@@ -248,7 +248,7 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
             });
 
             foundAnnotation = {
-              class_name: anomaly?.class_name,
+              class_name: anomaly?.damage_class,
               severity: anomaly?.severity,
               confidence_score: anomaly?.confidence_score,
               mask: anomaly?.mask_original_frame, // Use a unique reference
@@ -287,11 +287,10 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
       ?.join?.(" ");
   };
 
-  //extract severity from class_name after _ like from class_name_9 sevierty is 9
-  // Extract severity as a string (e.g., "9") from class_name like "class_name_9"
-  const severityMatch = hoveredAnnotation?.class_name?.match(/_(\d+)$/);
-  const severity =
-    hoveredAnnotation?.severity || (severityMatch ? severityMatch[1] : 1);
+  // const severityMatch = hoveredAnnotation?.class_name?.match(/_(\d+)$/);
+  // const severity =
+  //   hoveredAnnotation?.severity || (severityMatch ? severityMatch[1] : 1);
+  const severity = hoveredAnnotation?.severity;
 
   // Clean class_name: remove everything after the first underscore
   const cleanClassName = (name) => {
@@ -320,21 +319,20 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
           }}
         >
           <p style={{ textTransform: "capitalize" }}>
-            <strong>Anomaly:</strong>{" "}
+            <span>Anomaly:</span>{" "}
             {sanitize(cleanClassName(hoveredAnnotation.class_name))}
           </p>
           {severity && (
             <p>
-              <strong>Severity: {severity}</strong>
+              <span>Severity: {severity}</span>
             </p>
           )}
           {hoveredAnnotation.structural_class && (
             <p>
-              <strong>Structure: </strong>
+              <span>Structure: </span>
               {sanitize(hoveredAnnotation.structural_class)}
             </p>
           )}
-          <strong></strong>
         </div>
       )}
     </div>
