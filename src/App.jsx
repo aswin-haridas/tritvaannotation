@@ -57,7 +57,7 @@ function App() {
 
   return (
     <>
-      <h3>Annotated Image Viewer</h3>
+      <h3>Annotated Image</h3>
       {imageUrl && annotationData && (
         <AnnotatedImage imageUrl={imageUrl} annotationData={annotationData} />
       )}

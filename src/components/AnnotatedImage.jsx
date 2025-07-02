@@ -180,6 +180,7 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
         const allAnomalies = [
           ...(element?.yolo_anomalies || []),
           ...(element?.mask_rcnn_anomalies || []),
+          ...(element?.open_world_detections || []),
         ];
 
         for (let j = allAnomalies?.length - 1; j >= 0; j--) {
@@ -249,7 +250,7 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
 
             foundAnnotation = {
               class_name: anomaly?.damage_class,
-              severity: anomaly?.severity,
+              severity: anomaly?.severity || 1, // Default severity to 1 if not provided
               confidence_score: anomaly?.confidence_score,
               mask: anomaly?.mask_original_frame, // Use a unique reference
               structural_class: structuralClass, // Add structural class information
@@ -290,7 +291,6 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
   // const severityMatch = hoveredAnnotation?.class_name?.match(/_(\d+)$/);
   // const severity =
   //   hoveredAnnotation?.severity || (severityMatch ? severityMatch[1] : 1);
-  const severity = hoveredAnnotation?.severity;
 
   // Clean class_name: remove everything after the first underscore
   const cleanClassName = (name) => {
@@ -322,9 +322,9 @@ const AnnotatedImage = ({ imageUrl, annotationData }) => {
             <span>Anomaly:</span>{" "}
             {sanitize(cleanClassName(hoveredAnnotation.class_name))}
           </p>
-          {severity && (
+          {hoveredAnnotation?.severity && (
             <p>
-              <span>Severity: {severity}</span>
+              <span>Severity: {hoveredAnnotation?.severity}</span>
             </p>
           )}
           {hoveredAnnotation.structural_class && (
