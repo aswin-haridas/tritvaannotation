@@ -7,23 +7,21 @@ function App() {
   const [annotationData, setAnnotationData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const apiKey = "http://localhost:5000";
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-
         // Fetch annotation data
-        const annotationResponse = await fetch(
-          "http://localhost:5000/api/annotations"
-        );
+        const annotationResponse = await fetch(`${apiKey}/api/annotations`);
         if (!annotationResponse.ok) {
           throw new Error("Failed to fetch annotation data");
         }
         const annotations = await annotationResponse.json();
 
         // Fetch image
-        const imageResponse = await fetch("http://localhost:5000/api/image");
+        const imageResponse = await fetch(`${apiKey}/api/image`);
         if (!imageResponse.ok) {
           throw new Error("Failed to fetch image");
         }
@@ -57,7 +55,7 @@ function App() {
 
   return (
     <>
-      <h3>Annotated Image</h3>
+      <h3 style={{ paddingBottom: 10 }}>Annotated Image</h3>
       {imageUrl && annotationData && (
         <AnnotatedImage imageUrl={imageUrl} annotationData={annotationData} />
       )}
