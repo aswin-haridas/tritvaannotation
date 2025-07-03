@@ -302,7 +302,38 @@ export const useAnnotationCanvas = (
       const scaleX = canvas?.width / originalImageWidth;
       const scaleY = canvas?.height / originalImageHeight;
 
-      // First check for open world detection boxes
+      // Reverse search to find the topmost annotation
+      for (let i = (annotationData?.length || 0) - 1; i >= 0; i--) {
+        const element = annotationData?.[i];
+        const allAnomalies = getAllAnomalies(element);
+
+        for (let j = allAnomalies?.length - 1; j >= 0; j--) {
+          const anomaly = allAnomalies?.[j];
+
+          let isInside = false;
+          anomaly?.damage_masks_original_frame?.forEach?.((polygon) => {
+            if (isPointInPolygon(ctx, polygon, scaleX, scaleY, x, y)) {
+              isInside = true;
+            }
+          });
+
+          if (isInside) {
+            const structuralClass = getStructuralClass(anomaly, annotationData);
+
+            foundAnnotation = {
+              class_name: anomaly?.damage_class,
+              severity: anomaly?.severity || 1, // Default severity to 1 if not provided
+              confidence_score: anomaly?.confidence_score,
+              mask: anomaly?.damage_masks_original_frame, // Use a unique reference
+              structural_class: structuralClass, // Add structural class information
+            };
+            break;
+          }
+        }
+        if (foundAnnotation) break;
+      }
+
+      //  check for open world detection boxes
       for (let i = (annotationData?.length || 0) - 1; i >= 0; i--) {
         const element = annotationData?.[i];
         if (element?.open_world_detections) {
@@ -339,43 +370,6 @@ export const useAnnotationCanvas = (
         if (foundAnnotation) break;
       }
 
-      // If no open world detection was found, check for anomaly polygons
-      if (!foundAnnotation) {
-        // Reverse search to find the topmost annotation
-        for (let i = (annotationData?.length || 0) - 1; i >= 0; i--) {
-          const element = annotationData?.[i];
-          const allAnomalies = getAllAnomalies(element);
-
-          for (let j = allAnomalies?.length - 1; j >= 0; j--) {
-            const anomaly = allAnomalies?.[j];
-
-            let isInside = false;
-            anomaly?.damage_masks_original_frame?.forEach?.((polygon) => {
-              if (isPointInPolygon(ctx, polygon, scaleX, scaleY, x, y)) {
-                isInside = true;
-              }
-            });
-
-            if (isInside) {
-              const structuralClass = getStructuralClass(
-                anomaly,
-                annotationData
-              );
-
-              foundAnnotation = {
-                class_name: anomaly?.damage_class,
-                severity: anomaly?.severity || 1, // Default severity to 1 if not provided
-                confidence_score: anomaly?.confidence_score,
-                mask: anomaly?.damage_masks_original_frame, // Use a unique reference
-                structural_class: structuralClass, // Add structural class information
-              };
-              break;
-            }
-          }
-          if (foundAnnotation) break;
-        }
-      }
-
       setHoveredAnnotation(foundAnnotation);
       setTooltipPosition({ x: event?.clientX, y: event?.clientY });
     };
@@ -403,35 +397,3 @@ export const useAnnotationCanvas = (
 
   return { hoveredAnnotation, tooltipPosition };
 };
-
-// TOOLTIP IMPLEMENTATION GUIDE:
-// In your tooltip component that uses hoveredAnnotation state:
-//
-// function AnnotationTooltip({ hoveredAnnotation }) {
-//   // For open world detections, only show the label
-//   if (hoveredAnnotation?.isOpenWorldDetection) {
-//     return (
-//       <div className="tooltip">
-//         {hoveredAnnotation.label}
-//       </div>
-//     );
-//   }
-//
-//   // For regular annotations, show the original information
-//   if (hoveredAnnotation?.class_name) {
-//     return (
-//       <div className="tooltip">
-//         <div>Class: {hoveredAnnotation.class_name}</div>
-//         <div>Severity: {hoveredAnnotation.severity}</div>
-//         {hoveredAnnotation.confidence_score && (
-//           <div>Confidence: {hoveredAnnotation.confidence_score.toFixed(2)}</div>
-//         )}
-//         {hoveredAnnotation.structural_class && (
-//           <div>Structure: {hoveredAnnotation.structural_class}</div>
-//         )}
-//       </div>
-//     );
-//   }
-//
-//   return null;
-// }
