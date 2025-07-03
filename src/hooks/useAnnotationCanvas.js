@@ -95,10 +95,10 @@ export const useAnnotationCanvas = (
         const isHovered =
           hoveredAnnotation?.mask === anomaly?.mask_original_frame;
         const color = getAnomalyColor(
-          anomaly?.class_name,
+          anomaly?.damage_class,
           isHovered ? 0.7 : 0.4
         ); // More opaque on hover
-        const borderColor = getAnomalyColor(anomaly?.class_name, 1);
+        const borderColor = getAnomalyColor(anomaly?.damage_class, 1);
 
         ctx.fillStyle = color;
         ctx.strokeStyle = borderColor;
@@ -243,7 +243,7 @@ export const useAnnotationCanvas = (
             foundAnnotation = {
               class_name: anomaly?.damage_class,
               severity: anomaly?.severity || 1, // Default severity to 1 if not provided
-              confidence_score: anomaly?.confidence_score,
+              confidence_score: anomaly?.damage_confidence,
               mask: anomaly?.mask_original_frame, // Use a unique reference
               structural_class: structuralClass, // Add structural class information
             };
