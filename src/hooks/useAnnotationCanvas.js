@@ -17,6 +17,7 @@ export const useAnnotationCanvas = (
       ...(element?.yolo_anomalies || []),
       ...(element?.mask_rcnn_anomalies || []),
       ...(element?.open_world_detections || []),
+      ...(element?.unmatched_anomalies || []),
     ];
   };
   const drawAnnotations = useCallback(() => {
@@ -40,20 +41,16 @@ export const useAnnotationCanvas = (
     // Clear canvas before drawing
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // First, draw structural bounding boxes (behind anomalies)
+    // First, draw open world detection boxes (behind everything else)
     annotationData?.forEach?.((element) => {
-      const detections = element?.open_world_detections;
-      const structuralClass = element?.structural_class;
-
-      if (Array.isArray(detections) && structuralClass) {
-        detections.forEach((detection) => {
-          const boundingBox = detection?.boxes;
+      if (element?.open_world_detections) {
+        element.open_world_detections.forEach((detection) => {
           if (
-            boundingBox &&
-            Array.isArray(boundingBox) &&
-            boundingBox.length === 4
+            detection.boxes &&
+            Array.isArray(detection.boxes) &&
+            detection.boxes.length === 4
           ) {
-            const [x1, y1, x2, y2] = boundingBox;
+            const [x1, y1, x2, y2] = detection.boxes;
 
             // Scale coordinates
             const scaledX1 = x1 * scaleX;
@@ -62,8 +59,8 @@ export const useAnnotationCanvas = (
             const scaledY2 = y2 * scaleY;
 
             // Draw bounding box with light styling
-            ctx.strokeStyle = "rgba(78, 152, 87, 0.5)"; // Gray with low opacity
-            ctx.fillStyle = "rgba(63, 99, 59, 0)"; // Very light gray fill
+            ctx.strokeStyle = "rgba(0, 255, 34, 0.2)"; // Light blue with low opacity
+            ctx.fillStyle = "rgba(0, 255, 34, 0.001)"; // Very light blue fill
             ctx.lineWidth = 1;
 
             ctx.fillRect(
@@ -78,11 +75,51 @@ export const useAnnotationCanvas = (
               scaledX2 - scaledX1,
               scaledY2 - scaledY1
             );
-
-            // Reset line dash for anomalies
-            ctx.setLineDash?.([]);
           }
         });
+      }
+    });
+
+    // Next, draw structural bounding boxes (behind anomalies)
+    annotationData?.forEach?.((element) => {
+      // Access the structural bounding box directly from the element
+      const boundingBox = element?.structural_bbox_original_frame;
+      const structuralClass = element?.structural_class;
+
+      if (
+        boundingBox &&
+        Array.isArray(boundingBox) &&
+        boundingBox.length === 4 &&
+        structuralClass
+      ) {
+        const [x1, y1, x2, y2] = boundingBox;
+
+        // Scale coordinates
+        const scaledX1 = x1 * scaleX;
+        const scaledY1 = y1 * scaleY;
+        const scaledX2 = x2 * scaleX;
+        const scaledY2 = y2 * scaleY;
+
+        // Draw bounding box with light styling
+        ctx.strokeStyle = "rgb(238, 0, 255)"; // Green-gray with low opacity
+        ctx.fillStyle = "rgba(194, 32, 206, 0.001)"; // Very light green-gray fill
+        ctx.lineWidth = 1;
+
+        ctx.fillRect(
+          scaledX1,
+          scaledY1,
+          scaledX2 - scaledX1,
+          scaledY2 - scaledY1
+        );
+        ctx.strokeRect(
+          scaledX1,
+          scaledY1,
+          scaledX2 - scaledX1,
+          scaledY2 - scaledY1
+        );
+
+        // Reset line dash for anomalies
+        ctx.setLineDash?.([]);
       }
     });
 
@@ -93,7 +130,7 @@ export const useAnnotationCanvas = (
 
       allAnomalies?.forEach?.((anomaly) => {
         const isHovered =
-          hoveredAnnotation?.mask === anomaly?.mask_original_frame;
+          hoveredAnnotation?.mask === anomaly?.damage_masks_original_frame;
         const color = getAnomalyColor(
           anomaly?.damage_class,
           isHovered ? 0.7 : 0.4
@@ -104,7 +141,7 @@ export const useAnnotationCanvas = (
         ctx.strokeStyle = borderColor;
         ctx.lineWidth = isHovered ? 2 : 1;
 
-        anomaly?.mask_original_frame?.forEach?.((polygon) => {
+        anomaly?.damage_masks_original_frame?.forEach?.((polygon) => {
           if (polygon?.length < 3) return; // Not a valid polygon
 
           ctx.beginPath?.();
@@ -156,7 +193,14 @@ export const useAnnotationCanvas = (
       image?.removeEventListener?.("load", handleLoad);
       window.removeEventListener("resize", handleResize);
     };
-  }, [annotationData, hoveredAnnotation, drawAnnotations, imageRef]); // Redraw when data or hovered annotation changes
+  }, [
+    annotationData,
+    hoveredAnnotation,
+    drawAnnotations,
+    imageRef,
+    originalImageWidth,
+    originalImageHeight,
+  ]); // Redraw when data or hovered annotation changes
 
   // Effect for handling mouse interactions
   useEffect(() => {
@@ -181,7 +225,7 @@ export const useAnnotationCanvas = (
           const scaleY = canvas?.height / originalImageHeight;
 
           let isInside = false;
-          anomaly?.mask_original_frame?.forEach?.((polygon) => {
+          anomaly?.damage_masks_original_frame?.forEach?.((polygon) => {
             if (polygon?.length < 3) return;
             ctx?.beginPath?.();
             ctx?.moveTo?.(
@@ -218,7 +262,7 @@ export const useAnnotationCanvas = (
                 let isInsideStructure = false;
 
                 // Check each polygon in the mask
-                anomaly?.mask_original_frame?.forEach?.((polygon) => {
+                anomaly?.damage_masks_original_frame?.forEach?.((polygon) => {
                   // Check each point in the polygon
                   for (let k = 0; k < (polygon?.length || 0); k++) {
                     const [point_x, point_y] = polygon?.[k] || [];
@@ -243,8 +287,8 @@ export const useAnnotationCanvas = (
             foundAnnotation = {
               class_name: anomaly?.damage_class,
               severity: anomaly?.severity || 1, // Default severity to 1 if not provided
-              confidence_score: anomaly?.damage_confidence,
-              mask: anomaly?.mask_original_frame, // Use a unique reference
+              confidence_score: anomaly?.confidence_score,
+              mask: anomaly?.damage_masks_original_frame, // Use a unique reference
               structural_class: structuralClass, // Add structural class information
             };
             break;
