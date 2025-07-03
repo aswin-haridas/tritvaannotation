@@ -12,77 +12,124 @@ export const useAnnotationCanvas = (
   const [hoveredAnnotation, setHoveredAnnotation] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
 
-  const getAllAnomalies = (element) => {
+  // Helper functions
+  const getAllAnomalies = useCallback((element) => {
     return [
       ...(element?.yolo_anomalies || []),
       ...(element?.mask_rcnn_anomalies || []),
       ...(element?.open_world_detections || []),
       ...(element?.unmatched_anomalies || []),
     ];
-  };
-  const drawAnnotations = useCallback(() => {
-    const canvas = canvasRef.current;
-    const image = imageRef.current;
-    const container = containerRef.current;
-    const ctx = canvas?.getContext("2d");
+  }, []);
 
-    if (!image || !container || !ctx) return; // Use the image dimensions we've already extracted from annotationData
+  const isPointInPolygon = useCallback((ctx, polygon, scaleX, scaleY, x, y) => {
+    if (polygon?.length < 3) return false;
 
-    // Set canvas size to match the displayed image size
-    const { width: displayWidth, height: displayHeight } =
-      container?.getBoundingClientRect?.() || { width: 0, height: 0 };
-    canvas.width = displayWidth;
-    canvas.height = displayHeight;
+    ctx.beginPath();
+    ctx.moveTo(polygon[0][0] * scaleX, polygon[0][1] * scaleY);
 
-    // Calculate scaling factors
-    const scaleX = displayWidth / originalImageWidth;
-    const scaleY = displayHeight / originalImageHeight;
+    for (let k = 1; k < polygon.length; k++) {
+      ctx.lineTo(polygon[k][0] * scaleX, polygon[k][1] * scaleY);
+    }
 
-    // Clear canvas before drawing
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.closePath();
+    return ctx.isPointInPath(x, y);
+  }, []);
 
-    // First, draw open world detection boxes (behind everything else)
-    annotationData?.forEach?.((element) => {
-      if (element?.open_world_detections) {
-        element.open_world_detections.forEach((detection) => {
-          if (
-            detection.boxes &&
-            Array.isArray(detection.boxes) &&
-            detection.boxes.length === 4
-          ) {
-            const [x1, y1, x2, y2] = detection.boxes;
+  const getStructuralClass = useCallback((anomaly, annotationData) => {
+    let structuralClass = null;
 
-            // Scale coordinates
-            const scaledX1 = x1 * scaleX;
-            const scaledY1 = y1 * scaleY;
-            const scaledX2 = x2 * scaleX;
-            const scaledY2 = y2 * scaleY;
+    annotationData?.forEach((structElement) => {
+      if (
+        structElement?.structural_bbox_original_frame &&
+        structElement?.structural_class
+      ) {
+        const [box_x1, box_y1, box_x2, box_y2] =
+          structElement.structural_bbox_original_frame;
 
-            // Draw bounding box with light styling
-            ctx.strokeStyle = "rgba(0, 255, 34, 0.2)"; // Light blue with low opacity
-            ctx.fillStyle = "rgba(0, 255, 34, 0.001)"; // Very light blue fill
-            ctx.lineWidth = 1;
+        // Check if at least one point of any polygon is inside this bounding box
+        let isInsideStructure = false;
 
-            ctx.fillRect(
-              scaledX1,
-              scaledY1,
-              scaledX2 - scaledX1,
-              scaledY2 - scaledY1
-            );
-            ctx.strokeRect(
-              scaledX1,
-              scaledY1,
-              scaledX2 - scaledX1,
-              scaledY2 - scaledY1
-            );
+        // Check each polygon in the mask
+        anomaly?.damage_masks_original_frame?.forEach((polygon) => {
+          // Check each point in the polygon
+          for (let k = 0; k < (polygon?.length || 0); k++) {
+            const [point_x, point_y] = polygon?.[k] || [];
+            if (
+              point_x >= box_x1 &&
+              point_x <= box_x2 &&
+              point_y >= box_y1 &&
+              point_y <= box_y2
+            ) {
+              isInsideStructure = true;
+              break;
+            }
           }
         });
+
+        if (isInsideStructure) {
+          structuralClass = structElement.structural_class;
+        }
       }
     });
 
-    // Next, draw structural bounding boxes (behind anomalies)
-    annotationData?.forEach?.((element) => {
-      // Access the structural bounding box directly from the element
+    return structuralClass;
+  }, []);
+
+  // Drawing functions
+  const drawOpenWorldDetections = useCallback(
+    (ctx, element, scaleX, scaleY) => {
+      if (!element?.open_world_detections) return;
+
+      element.open_world_detections.forEach((detection) => {
+        if (
+          detection.boxes &&
+          Array.isArray(detection.boxes) &&
+          detection.boxes.length === 4
+        ) {
+          const [x1, y1, x2, y2] = detection.boxes;
+          let label = detection.label || "unknown";
+
+          // Scale coordinates
+          const scaledX1 = x1 * scaleX;
+          const scaledY1 = y1 * scaleY;
+          const scaledX2 = x2 * scaleX;
+          const scaledY2 = y2 * scaleY;
+
+          // Check if this is the hovered detection to highlight it
+          const isHovered =
+            hoveredAnnotation?.isOpenWorldDetection &&
+            hoveredAnnotation?.label === label;
+
+          // Draw bounding box with light styling
+          ctx.strokeStyle = isHovered
+            ? "rgba(0, 255, 34, 0.8)"
+            : "rgba(0, 255, 34, 0.2)"; // Brighter when hovered
+          ctx.fillStyle = isHovered
+            ? "rgba(0, 255, 34, 0.05)"
+            : "rgba(0, 255, 34, 0.001)"; // Slightly more visible when hovered
+          ctx.lineWidth = isHovered ? 2 : 1;
+
+          ctx.fillRect(
+            scaledX1,
+            scaledY1,
+            scaledX2 - scaledX1,
+            scaledY2 - scaledY1
+          );
+          ctx.strokeRect(
+            scaledX1,
+            scaledY1,
+            scaledX2 - scaledX1,
+            scaledY2 - scaledY1
+          );
+        }
+      });
+    },
+    [hoveredAnnotation]
+  );
+
+  const drawStructuralBoundingBox = useCallback(
+    (ctx, element, scaleX, scaleY) => {
       const boundingBox = element?.structural_bbox_original_frame;
       const structuralClass = element?.structural_class;
 
@@ -121,14 +168,13 @@ export const useAnnotationCanvas = (
         // Reset line dash for anomalies
         ctx.setLineDash?.([]);
       }
-    });
+    },
+    []
+  );
 
-    // Then, draw anomalies on top
-    annotationData?.forEach?.((element) => {
-      // We only care about drawing the anomalies here
-      const allAnomalies = getAllAnomalies(element);
-
-      allAnomalies?.forEach?.((anomaly) => {
+  const drawAnomalyPolygons = useCallback(
+    (ctx, anomalies, hoveredAnnotation, scaleX, scaleY) => {
+      anomalies?.forEach?.((anomaly) => {
         const isHovered =
           hoveredAnnotation?.mask === anomaly?.damage_masks_original_frame;
         const color = getAnomalyColor(
@@ -160,6 +206,45 @@ export const useAnnotationCanvas = (
           ctx.stroke?.();
         });
       });
+    },
+    []
+  );
+
+  const drawAnnotations = useCallback(() => {
+    const canvas = canvasRef.current;
+    const image = imageRef.current;
+    const container = containerRef.current;
+    const ctx = canvas?.getContext("2d");
+
+    if (!image || !container || !ctx) return;
+
+    // Set canvas size to match the displayed image size
+    const { width: displayWidth, height: displayHeight } =
+      container?.getBoundingClientRect?.() || { width: 0, height: 0 };
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
+
+    // Calculate scaling factors
+    const scaleX = displayWidth / originalImageWidth;
+    const scaleY = displayHeight / originalImageHeight;
+
+    // Clear canvas before drawing
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // First, draw open world detection boxes (behind everything else)
+    annotationData?.forEach?.((element) => {
+      drawOpenWorldDetections(ctx, element, scaleX, scaleY);
+    });
+
+    // Next, draw structural bounding boxes (behind anomalies)
+    annotationData?.forEach?.((element) => {
+      drawStructuralBoundingBox(ctx, element, scaleX, scaleY);
+    });
+
+    // Then, draw anomalies on top
+    annotationData?.forEach?.((element) => {
+      const allAnomalies = getAllAnomalies(element);
+      drawAnomalyPolygons(ctx, allAnomalies, hoveredAnnotation, scaleX, scaleY);
     });
   }, [
     annotationData,
@@ -169,6 +254,10 @@ export const useAnnotationCanvas = (
     canvasRef,
     imageRef,
     containerRef,
+    getAllAnomalies,
+    drawOpenWorldDetections,
+    drawStructuralBoundingBox,
+    drawAnomalyPolygons,
   ]);
 
   // Effect for initial drawing and redrawing on window resize
@@ -188,19 +277,14 @@ export const useAnnotationCanvas = (
       handleLoad?.();
     } else {
       image?.addEventListener?.("load", handleLoad);
-    } // Cleanup
+    }
+
+    // Cleanup
     return () => {
       image?.removeEventListener?.("load", handleLoad);
       window.removeEventListener("resize", handleResize);
     };
-  }, [
-    annotationData,
-    hoveredAnnotation,
-    drawAnnotations,
-    imageRef,
-    originalImageWidth,
-    originalImageHeight,
-  ]); // Redraw when data or hovered annotation changes
+  }, [drawAnnotations, imageRef]);
 
   // Effect for handling mouse interactions
   useEffect(() => {
@@ -214,87 +298,82 @@ export const useAnnotationCanvas = (
       const y = event.clientY - (rect?.top || 0);
       let foundAnnotation = null;
 
-      // Reverse search to find the topmost annotation
+      // Scaling factors
+      const scaleX = canvas?.width / originalImageWidth;
+      const scaleY = canvas?.height / originalImageHeight;
+
+      // First check for open world detection boxes
       for (let i = (annotationData?.length || 0) - 1; i >= 0; i--) {
         const element = annotationData?.[i];
-        const allAnomalies = getAllAnomalies(element);
+        if (element?.open_world_detections) {
+          for (let j = 0; j < element.open_world_detections.length; j++) {
+            const detection = element.open_world_detections[j];
+            if (
+              detection.boxes &&
+              Array.isArray(detection.boxes) &&
+              detection.boxes.length === 4
+            ) {
+              const [x1, y1, x2, y2] = detection.boxes;
+              const scaledX1 = x1 * scaleX;
+              const scaledY1 = y1 * scaleY;
+              const scaledX2 = x2 * scaleX;
+              const scaledY2 = y2 * scaleY;
 
-        for (let j = allAnomalies?.length - 1; j >= 0; j--) {
-          const anomaly = allAnomalies?.[j]; // Recreate path to use isPointInPath
-          const scaleX = canvas?.width / originalImageWidth;
-          const scaleY = canvas?.height / originalImageHeight;
-
-          let isInside = false;
-          anomaly?.damage_masks_original_frame?.forEach?.((polygon) => {
-            if (polygon?.length < 3) return;
-            ctx?.beginPath?.();
-            ctx?.moveTo?.(
-              polygon?.[0]?.[0] * scaleX,
-              polygon?.[0]?.[1] * scaleY
-            );
-            for (let k = 1; k < polygon?.length; k++) {
-              ctx?.lineTo?.(
-                polygon?.[k]?.[0] * scaleX,
-                polygon?.[k]?.[1] * scaleY
-              );
-            }
-            ctx?.closePath?.();
-            if (ctx?.isPointInPath?.(x, y)) {
-              isInside = true;
-            }
-          });
-
-          if (isInside) {
-            // Find if this anomaly is inside any structural bounding box
-            let structuralClass = null;
-
-            // Check against all structural bounding boxes
-            annotationData?.forEach?.((structElement) => {
+              // Check if mouse is inside this box
               if (
-                structElement?.structural_bbox_original_frame &&
-                structElement?.structural_class
+                x >= scaledX1 &&
+                x <= scaledX2 &&
+                y >= scaledY1 &&
+                y <= scaledY2
               ) {
-                // console.log(structElement.structural_class);
-                const [box_x1, box_y1, box_x2, box_y2] =
-                  structElement.structural_bbox_original_frame;
-
-                // Check if at least one point of any polygon is inside this bounding box
-                let isInsideStructure = false;
-
-                // Check each polygon in the mask
-                anomaly?.damage_masks_original_frame?.forEach?.((polygon) => {
-                  // Check each point in the polygon
-                  for (let k = 0; k < (polygon?.length || 0); k++) {
-                    const [point_x, point_y] = polygon?.[k] || [];
-                    if (
-                      point_x >= box_x1 &&
-                      point_x <= box_x2 &&
-                      point_y >= box_y1 &&
-                      point_y <= box_y2
-                    ) {
-                      isInsideStructure = true;
-                      break;
-                    }
-                  }
-                });
-
-                if (isInsideStructure) {
-                  structuralClass = structElement.structural_class;
-                }
+                const label = detection.label || "Unknown";
+                foundAnnotation = {
+                  isOpenWorldDetection: true,
+                  label: label,
+                };
+                break;
               }
-            });
-
-            foundAnnotation = {
-              class_name: anomaly?.damage_class,
-              severity: anomaly?.severity || 1, // Default severity to 1 if not provided
-              confidence_score: anomaly?.confidence_score,
-              mask: anomaly?.damage_masks_original_frame, // Use a unique reference
-              structural_class: structuralClass, // Add structural class information
-            };
-            break;
+            }
           }
         }
         if (foundAnnotation) break;
+      }
+
+      // If no open world detection was found, check for anomaly polygons
+      if (!foundAnnotation) {
+        // Reverse search to find the topmost annotation
+        for (let i = (annotationData?.length || 0) - 1; i >= 0; i--) {
+          const element = annotationData?.[i];
+          const allAnomalies = getAllAnomalies(element);
+
+          for (let j = allAnomalies?.length - 1; j >= 0; j--) {
+            const anomaly = allAnomalies?.[j];
+
+            let isInside = false;
+            anomaly?.damage_masks_original_frame?.forEach?.((polygon) => {
+              if (isPointInPolygon(ctx, polygon, scaleX, scaleY, x, y)) {
+                isInside = true;
+              }
+            });
+
+            if (isInside) {
+              const structuralClass = getStructuralClass(
+                anomaly,
+                annotationData
+              );
+
+              foundAnnotation = {
+                class_name: anomaly?.damage_class,
+                severity: anomaly?.severity || 1, // Default severity to 1 if not provided
+                confidence_score: anomaly?.confidence_score,
+                mask: anomaly?.damage_masks_original_frame, // Use a unique reference
+                structural_class: structuralClass, // Add structural class information
+              };
+              break;
+            }
+          }
+          if (foundAnnotation) break;
+        }
       }
 
       setHoveredAnnotation(foundAnnotation);
@@ -312,7 +391,47 @@ export const useAnnotationCanvas = (
       canvas?.removeEventListener?.("mousemove", handleMouseMove);
       canvas?.removeEventListener?.("mouseleave", handleMouseLeave);
     };
-  }, [annotationData, originalImageWidth, originalImageHeight, canvasRef]); // Rerun if data changes
+  }, [
+    annotationData,
+    originalImageWidth,
+    originalImageHeight,
+    canvasRef,
+    getAllAnomalies,
+    isPointInPolygon,
+    getStructuralClass,
+  ]);
 
   return { hoveredAnnotation, tooltipPosition };
 };
+
+// TOOLTIP IMPLEMENTATION GUIDE:
+// In your tooltip component that uses hoveredAnnotation state:
+//
+// function AnnotationTooltip({ hoveredAnnotation }) {
+//   // For open world detections, only show the label
+//   if (hoveredAnnotation?.isOpenWorldDetection) {
+//     return (
+//       <div className="tooltip">
+//         {hoveredAnnotation.label}
+//       </div>
+//     );
+//   }
+//
+//   // For regular annotations, show the original information
+//   if (hoveredAnnotation?.class_name) {
+//     return (
+//       <div className="tooltip">
+//         <div>Class: {hoveredAnnotation.class_name}</div>
+//         <div>Severity: {hoveredAnnotation.severity}</div>
+//         {hoveredAnnotation.confidence_score && (
+//           <div>Confidence: {hoveredAnnotation.confidence_score.toFixed(2)}</div>
+//         )}
+//         {hoveredAnnotation.structural_class && (
+//           <div>Structure: {hoveredAnnotation.structural_class}</div>
+//         )}
+//       </div>
+//     );
+//   }
+//
+//   return null;
+// }
