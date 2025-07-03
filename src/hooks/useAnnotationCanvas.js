@@ -101,7 +101,7 @@ export const useAnnotationCanvas = (
         const scaledY2 = y2 * scaleY;
 
         // Draw bounding box with light styling
-        ctx.strokeStyle = "rgb(238, 0, 255)"; // Green-gray with low opacity
+        ctx.strokeStyle = "rgba(238, 0, 255, 0)"; // Green-gray with low opacity
         ctx.fillStyle = "rgba(194, 32, 206, 0.001)"; // Very light green-gray fill
         ctx.lineWidth = 1;
 

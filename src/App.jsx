@@ -57,7 +57,66 @@ function App() {
     <>
       <h3 style={{ paddingBottom: 10 }}>Annotated Image</h3>
       {imageUrl && annotationData && (
-        <AnnotatedImage imageUrl={imageUrl} annotationData={annotationData} />
+        <>
+          <AnnotatedImage imageUrl={imageUrl} annotationData={annotationData} />
+          {/* <div style={{ marginTop: 20 }}>
+            <h4>Legend</h4>
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              <li>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 16,
+                    height: 16,
+                    background: "rgb(0,255,0)",
+                    marginRight: 8,
+                    border: "1px solid #ccc",
+                  }}
+                ></span>
+                Crack
+              </li>
+              <li>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 16,
+                    height: 16,
+                    background: "rgb(255,165,0)",
+                    marginRight: 8,
+                    border: "1px solid #ccc",
+                  }}
+                ></span>
+                Spalling
+              </li>
+              <li>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 16,
+                    height: 16,
+                    background: "rgb(255,69,19)",
+                    marginRight: 8,
+                    border: "1px solid #ccc",
+                  }}
+                ></span>
+                Corrosion
+              </li>
+              <li>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 16,
+                    height: 16,
+                    background: "rgb(128,128,128)",
+                    marginRight: 8,
+                    border: "1px solid #ccc",
+                  }}
+                ></span>
+                Stain
+              </li>
+            </ul>
+          </div> */}
+        </>
       )}
     </>
   );
